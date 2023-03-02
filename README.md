@@ -47,9 +47,8 @@ queries on song play analysis.
 
 ## Fact and Dimension Tables
 
-1. **songplay**: This is the Fact table that takes song_id and artist_id from staging_songs table and all fields from
-   staing_events table.
+1. **songplay**: This is the Fact table that takes all fields from staging_events table.
 2. **user**: This is one of the dimension table that takes all fields from staging_events table
 3. **song**: This is one of the dimension table that takes all fields from staging_songs table
 4. **artist**: This is one of the dimension table that takes all fields from staging_songs table
-5. **time**: This is one of the dimension table that takes all fields from songplays table
+5. **time**: This is one of the dimension table that takes all fields from staging_events table

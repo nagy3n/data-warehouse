@@ -1,6 +1,5 @@
 import configparser
 
-
 # CONFIG
 config = configparser.ConfigParser()
 config.read('dwh.cfg')
@@ -57,12 +56,12 @@ CREATE TABLE "staging_songs" (
 
 songplay_table_create = ("""
 CREATE TABLE "songplay" (
-    "songplay_id" integer DEFAULT nextval('songplay_id_seq') NOT NULL,
+    "songplay_id" integer identity(0,1),
     "start_time" timestamp,
-    "user_id" integer,
+    "user_id" character varying(2048),
     "level" character varying(2048),
-    "song_id" integer,
-    "artist_id" integer,
+    "song_id" character varying(2048),
+    "artist_id" character varying(2048),
     "session_id" integer,
     "location" character varying(2048),
     "user_agent" character varying(2048)
@@ -83,7 +82,7 @@ song_table_create = ("""
 CREATE TABLE "song" (
     "song_id" character varying(2048) PRIMARY KEY,
     "title" character varying(2048),
-    "artist_id" integer,
+    "artist_id" character varying(2048),
     "year" integer,
     "duration" double precision
 );
@@ -125,23 +124,20 @@ staging_songs_copy = ("""
 
 songplay_table_insert = ("""
     INSERT INTO songplay(start_time, user_id, level, song_id, artist_id, session_id, location, user_agent)
-    SELECT 
-        TIMESTAMP 'epoch' + se.ts/1000 * INTERVAL '1 Second',
+    SELECT
+        TIMESTAMP 'epoch' + se.ts/1000 *INTERVAL '1 second',
         se.userId,
         se.level,
-        ss.song_id,
-        ss.artist_id,
+        se.song,
+        se.artist,
         se.sessionId,
         se.location,
         se.userAgent
     FROM staging_events se
-    JOIN staging_songs ss
-    ON se.song = ss.title AND se.artist = ss.artist_name
-    WHERE se.song is not null AND se.artist is not null
 """)
 
 user_table_insert = ("""
-    INSERT INTO user(user_id, first_name, last_name, gender, level)
+    INSERT INTO "user"(user_id, first_name, last_name, gender, level)
     SELECT 
         userId,
         firstName,
@@ -189,12 +185,31 @@ time_table_insert = ("""
 # QUERY LISTS
 
 create_table_queries = [
-    staging_events_table_create, staging_songs_table_create,
-    songplay_table_create, user_table_create, song_table_create, artist_table_create, time_table_create
+    staging_events_table_create,
+    staging_songs_table_create,
+    songplay_table_create,
+    user_table_create,
+    song_table_create,
+    artist_table_create,
+    time_table_create
 ]
 drop_table_queries = [
-    staging_events_table_drop, staging_songs_table_drop,
-    songplay_table_drop, user_table_drop, song_table_drop, artist_table_drop, time_table_drop
+    staging_events_table_drop,
+    staging_songs_table_drop,
+    songplay_table_drop,
+    user_table_drop,
+    song_table_drop,
+    artist_table_drop,
+    time_table_drop
 ]
-copy_table_queries = [staging_events_copy, staging_songs_copy]
-insert_table_queries = [songplay_table_insert, user_table_insert, song_table_insert, artist_table_insert, time_table_insert]
+copy_table_queries = [
+    staging_events_copy,
+    staging_songs_copy
+]
+insert_table_queries = [
+    songplay_table_insert,
+    user_table_insert,
+    song_table_insert,
+    artist_table_insert,
+    time_table_insert
+]

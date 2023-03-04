@@ -8,10 +8,10 @@ config.read('dwh.cfg')
 
 staging_events_table_drop = "DROP TABLE IF EXISTS \"staging_events\";"
 staging_songs_table_drop = "DROP TABLE IF EXISTS \"staging_songs\";"
-songplay_table_drop = "DROP TABLE IF EXISTS \"songplay\";"
-user_table_drop = "DROP TABLE IF EXISTS \"user\";"
-song_table_drop = "DROP TABLE IF EXISTS \"song\";"
-artist_table_drop = "DROP TABLE IF EXISTS \"artist\";"
+songplay_table_drop = "DROP TABLE IF EXISTS \"songplays\";"
+user_table_drop = "DROP TABLE IF EXISTS \"users\";"
+song_table_drop = "DROP TABLE IF EXISTS \"songs\";"
+artist_table_drop = "DROP TABLE IF EXISTS \"artists\";"
 time_table_drop = "DROP TABLE IF EXISTS \"time\";"
 
 # CREATE TABLES
@@ -42,7 +42,7 @@ CREATE TABLE "staging_events" (
 staging_songs_table_create = ("""
 CREATE TABLE "staging_songs" (
     "num_songs" integer NOT NULL,
-    "artist_id" character varying(2048) NOT NULL,
+    "artist_id" character varying(2048),
     "artist_latitude" double precision,
     "artist_longitude" double precision,
     "artist_location" character varying(2048),
@@ -55,13 +55,13 @@ CREATE TABLE "staging_songs" (
 """)
 
 songplay_table_create = ("""
-CREATE TABLE "songplay" (
+CREATE TABLE "songplays" (
     "songplay_id" integer identity(0,1),
-    "start_time" timestamp,
-    "user_id" character varying(2048),
+    "start_time" timestamp not null,
+    "user_id" character varying(2048) not null,
     "level" character varying(2048),
     "song_id" character varying(2048),
-    "artist_id" character varying(2048),
+    "artist_id" character varying(2048) not null,
     "session_id" integer,
     "location" character varying(2048),
     "user_agent" character varying(2048)
@@ -69,7 +69,7 @@ CREATE TABLE "songplay" (
 """)
 
 user_table_create = ("""
-CREATE TABLE "user" (
+CREATE TABLE "users" (
     "user_id" character varying(2048) PRIMARY KEY,
     "first_name" character varying(2048),
     "last_name" character varying(2048),
@@ -79,7 +79,7 @@ CREATE TABLE "user" (
 """)
 
 song_table_create = ("""
-CREATE TABLE "song" (
+CREATE TABLE "songs" (
     "song_id" character varying(2048) PRIMARY KEY,
     "title" character varying(2048),
     "artist_id" character varying(2048),
@@ -89,7 +89,7 @@ CREATE TABLE "song" (
 """)
 
 artist_table_create = ("""
-CREATE TABLE "artist" (
+CREATE TABLE "artists" (
     "artist_id" character varying(2048) PRIMARY KEY,
     "name" character varying(2048),
     "location" character varying(2048),
@@ -123,7 +123,7 @@ staging_songs_copy = ("""
 # FINAL TABLES
 
 songplay_table_insert = ("""
-    INSERT INTO songplay(start_time, user_id, level, song_id, artist_id, session_id, location, user_agent)
+    INSERT INTO songplays(start_time, user_id, level, song_id, artist_id, session_id, location, user_agent)
     SELECT
         TIMESTAMP 'epoch' + se.ts/1000 *INTERVAL '1 second',
         se.userId,
@@ -134,22 +134,28 @@ songplay_table_insert = ("""
         se.location,
         se.userAgent
     FROM staging_events se
+    LEFT JOIN staging_songs ss ON
+        se.song = ss.title AND
+        se.artist = ss.artist_name AND
+        ABS(se.length - ss.duration) < 2
+    WHERE se.page = 'NextSong'
 """)
 
 user_table_insert = ("""
-    INSERT INTO "user"(user_id, first_name, last_name, gender, level)
-    SELECT 
+    INSERT INTO "users"(user_id, first_name, last_name, gender, level)
+    SELECT DISTINCT (userId)
         userId,
         firstName,
         lastName,
         gender,
         level
     FROM staging_events
+    WHERE page='NextSong'
 """)
 
 song_table_insert = ("""
-    INSERT INTO song(song_id, title, artist_id, year, duration)
-    SELECT 
+    INSERT INTO songs(song_id, title, artist_id, year, duration)
+    SELECT DISTINCT (song_id)
         song_id,
         title,
         artist_id,
@@ -159,7 +165,7 @@ song_table_insert = ("""
 """)
 
 artist_table_insert = ("""
-    INSERT INTO artist(artist_id, name, location, latitude, longitude)
+    INSERT INTO artists(artist_id, name, location, latitude, longitude)
     SELECT DISTINCT (artist_id)
         artist_id,
         artist_name,
@@ -171,7 +177,8 @@ artist_table_insert = ("""
 
 time_table_insert = ("""
     INSERT INTO time(start_time, hour, day, week, month, year, weekday)
-    WITH temp_time AS (SELECT DISTINCT TIMESTAMP 'epoch' + (ts/1000 * INTERVAL '1 second') as ts FROM staging_events)
+    WITH temp_time AS (SELECT DISTINCT TIMESTAMP 'epoch' + (ts/1000 * INTERVAL '1 second') as ts FROM staging_events
+     WHERE page='NextSong')
     SELECT ts,
         extract(hour from ts),
         extract(day from ts),
